@@ -19,9 +19,15 @@ namespace {
 struct CountingHandler {
     std::array<std::uint64_t, 256> counts{};
 
-    void on_add_order(const ob::itch::AddOrder& m)       { ++counts[static_cast<unsigned char>(m.header.type)]; }
-    void on_order_delete(const ob::itch::OrderDelete& m) { ++counts[static_cast<unsigned char>(m.header.type)]; }
-    void on_other(char type, const std::uint8_t*, std::size_t) { ++counts[static_cast<unsigned char>(type)]; }
+    void count(char type) { ++counts[static_cast<unsigned char>(type)]; }
+
+    void on_add_order(const ob::itch::AddOrder& m)                                { count(m.header.type); }
+    void on_order_executed(const ob::itch::OrderExecuted& m)                      { count(m.header.type); }
+    void on_order_executed_with_price(const ob::itch::OrderExecutedWithPrice& m)  { count(m.header.type); }
+    void on_order_cancel(const ob::itch::OrderCancel& m)                          { count(m.header.type); }
+    void on_order_delete(const ob::itch::OrderDelete& m)                          { count(m.header.type); }
+    void on_order_replace(const ob::itch::OrderReplace& m)                        { count(m.header.type); }
+    void on_other(char type, const std::uint8_t*, std::size_t)                    { count(type); }
 };
 
 const char* status_name(ob::itch::ParseStatus s) {

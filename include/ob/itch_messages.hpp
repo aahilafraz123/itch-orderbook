@@ -1,7 +1,7 @@
 // ITCH 5.0 wire format: big-endian field readers and decoded message structs.
 //
-// Offsets and lengths are taken from the NASDAQ TotalView-ITCH 5.0 specification
-// (sections 1.3.1 Add Order - No MPID Attribution, 1.4.4 Order Delete).
+// Offsets and lengths are taken from the NASDAQ TotalView-ITCH 5.0 specification,
+// sections 1.3 (Add Order 'A', 'F') and 1.4 (Modify Order 'E', 'C', 'X', 'D', 'U').
 #pragma once
 
 #include <array>
@@ -68,29 +68,90 @@ inline constexpr std::size_t kHeaderLen = 11;
 
 enum class Side : char { Buy = 'B', Sell = 'S' };
 
-// 'A' Add Order - No MPID Attribution. 36 bytes.
+// Alpha fields are ASCII, right-padded with spaces. Return the text without the padding.
+template <std::size_t N>
+inline std::string_view trim_alpha(const std::array<char, N>& a) noexcept {
+    std::string_view s(a.data(), N);
+    return s.substr(0, s.find_last_not_of(' ') + 1);
+}
+
+// 'A' Add Order - No MPID Attribution (36 bytes) and
+// 'F' Add Order - MPID Attribution (40 bytes: the same 36, plus attribution).
+//
+// Both decode into this one struct. The book treats them identically (who
+// posted an order doesn't change where it sits), so one type means one code
+// path to test. header.type still says which one arrived.
 struct AddOrder {
     Header               header;
-    std::uint64_t        order_ref;  // offset 11
-    Side                 side;       // offset 19
-    std::uint32_t        shares;     // offset 20
-    std::array<char, 8>  stock;      // offset 24  ASCII, right-padded with spaces
-    std::uint32_t        price;      // offset 32  4 implied decimals: 1900500 = $190.0500
+    std::uint64_t        order_ref;    // offset 11
+    Side                 side;         // offset 19
+    std::uint32_t        shares;       // offset 20
+    std::array<char, 8>  stock;        // offset 24  e.g. "AAPL    "
+    std::uint32_t        price;        // offset 32  4 implied decimals: 1900500 = $190.0500
+    std::array<char, 4>  attribution;  // offset 36  'F' only: market participant ID, e.g. "GSCO".
+                                       //            All spaces for 'A'.
 
-    // Symbol without the trailing spaces, e.g. "AAPL".
-    std::string_view symbol() const noexcept {
-        std::string_view s(stock.data(), stock.size());
-        return s.substr(0, s.find_last_not_of(' ') + 1);
-    }
+    std::string_view symbol() const noexcept { return trim_alpha(stock); }
+    std::string_view mpid() const noexcept { return trim_alpha(attribution); }
 };
-inline constexpr std::size_t kAddOrderLen = 36;
+inline constexpr std::size_t kAddOrderLen     = 36;
+inline constexpr std::size_t kAddOrderMpidLen = 40;
+
+// 'E' Order Executed. 31 bytes.
+// Some of the order's shares traded at the order's own price.
+// Executions are cumulative: subtract from the order's remaining shares.
+struct OrderExecuted {
+    Header        header;
+    std::uint64_t order_ref;        // offset 11
+    std::uint32_t executed_shares;  // offset 19
+    std::uint64_t match_number;     // offset 23  day-unique trade ID
+};
+inline constexpr std::size_t kOrderExecutedLen = 31;
+
+// 'C' Order Executed With Price. 36 bytes.
+// Same as 'E', but the trade happened at a price different from the order's
+// display price (e.g. during a cross). The order's resting price doesn't change;
+// the book still just subtracts executed_shares.
+struct OrderExecutedWithPrice {
+    Header        header;
+    std::uint64_t order_ref;        // offset 11
+    std::uint32_t executed_shares;  // offset 19
+    std::uint64_t match_number;     // offset 23
+    char          printable;        // offset 31  'Y' or 'N'. 'N' = counted in a later bulk print
+    std::uint32_t execution_price;  // offset 32  4 implied decimals
+};
+inline constexpr std::size_t kOrderExecutedWithPriceLen = 36;
+
+// 'X' Order Cancel. 23 bytes.
+// Partial cancel: the owner pulled some shares. Subtract from remaining shares.
+struct OrderCancel {
+    Header        header;
+    std::uint64_t order_ref;        // offset 11
+    std::uint32_t canceled_shares;  // offset 19
+};
+inline constexpr std::size_t kOrderCancelLen = 23;
 
 // 'D' Order Delete. 19 bytes.
+// The whole order is gone, whatever shares were left.
 struct OrderDelete {
     Header        header;
     std::uint64_t order_ref;  // offset 11
 };
 inline constexpr std::size_t kOrderDeleteLen = 19;
+
+// 'U' Order Replace. 35 bytes.
+// Cancel-replace: remove the original order, then add a new one under a new
+// reference number. Side and stock aren't in the message because they can't
+// change; the book copies them from the original order. The new order goes to
+// the back of the queue at its price (it loses time priority).
+struct OrderReplace {
+    Header        header;
+    std::uint64_t original_order_ref;  // offset 11
+    std::uint64_t new_order_ref;       // offset 19  used by all later messages
+    std::uint32_t shares;              // offset 27  new total displayed shares
+    std::uint32_t price;               // offset 31  new display price
+};
+inline constexpr std::size_t kOrderReplaceLen = 35;
 
 // ---------------------------------------------------------------------------
 // Decoders. Caller guarantees `p` points at a full message of the right length.
@@ -112,11 +173,42 @@ inline AddOrder decode_add_order(const std::uint8_t* p) noexcept {
     m.shares    = read_u32(p + 20);
     std::memcpy(m.stock.data(), p + 24, m.stock.size());
     m.price     = read_u32(p + 32);
+    m.attribution.fill(' ');
     return m;
+}
+
+inline AddOrder decode_add_order_mpid(const std::uint8_t* p) noexcept {
+    AddOrder m = decode_add_order(p);
+    std::memcpy(m.attribution.data(), p + 36, m.attribution.size());
+    return m;
+}
+
+inline OrderExecuted decode_order_executed(const std::uint8_t* p) noexcept {
+    return OrderExecuted{decode_header(p), read_u64(p + 11), read_u32(p + 19), read_u64(p + 23)};
+}
+
+inline OrderExecutedWithPrice decode_order_executed_with_price(const std::uint8_t* p) noexcept {
+    return OrderExecutedWithPrice{
+        decode_header(p),
+        read_u64(p + 11),
+        read_u32(p + 19),
+        read_u64(p + 23),
+        static_cast<char>(p[31]),
+        read_u32(p + 32),
+    };
+}
+
+inline OrderCancel decode_order_cancel(const std::uint8_t* p) noexcept {
+    return OrderCancel{decode_header(p), read_u64(p + 11), read_u32(p + 19)};
 }
 
 inline OrderDelete decode_order_delete(const std::uint8_t* p) noexcept {
     return OrderDelete{decode_header(p), read_u64(p + 11)};
+}
+
+inline OrderReplace decode_order_replace(const std::uint8_t* p) noexcept {
+    return OrderReplace{decode_header(p), read_u64(p + 11), read_u64(p + 19),
+                        read_u32(p + 27), read_u32(p + 31)};
 }
 
 }  // namespace ob::itch

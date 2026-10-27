@@ -18,11 +18,17 @@ namespace ob::itch {
 // What a handler must provide. Checked at compile time, so a typo in a handler
 // method name is a clear error instead of a page of template noise.
 template <class H>
-concept Handler = requires(H& h, const AddOrder& a, const OrderDelete& d,
-                           char type, const std::uint8_t* bytes, std::size_t len) {
-    h.on_add_order(a);
-    h.on_order_delete(d);
-    h.on_other(type, bytes, len);  // every type we don't decode yet
+concept Handler = requires(H& h, char type, const std::uint8_t* bytes, std::size_t len,
+                           const AddOrder& add, const OrderExecuted& exec,
+                           const OrderExecutedWithPrice& exec_px, const OrderCancel& cancel,
+                           const OrderDelete& del, const OrderReplace& replace) {
+    h.on_add_order(add);  // 'A' and 'F'
+    h.on_order_executed(exec);
+    h.on_order_executed_with_price(exec_px);
+    h.on_order_cancel(cancel);
+    h.on_order_delete(del);
+    h.on_order_replace(replace);
+    h.on_other(type, bytes, len);  // every type that doesn't change the book
 };
 
 // Decode one message (without its length prefix) and call the handler.
@@ -41,9 +47,29 @@ inline bool dispatch(const std::uint8_t* msg, std::size_t len, H& handler) {
             if (len != kAddOrderLen) return false;
             handler.on_add_order(decode_add_order(msg));
             return true;
+        case 'F':
+            if (len != kAddOrderMpidLen) return false;
+            handler.on_add_order(decode_add_order_mpid(msg));
+            return true;
+        case 'E':
+            if (len != kOrderExecutedLen) return false;
+            handler.on_order_executed(decode_order_executed(msg));
+            return true;
+        case 'C':
+            if (len != kOrderExecutedWithPriceLen) return false;
+            handler.on_order_executed_with_price(decode_order_executed_with_price(msg));
+            return true;
+        case 'X':
+            if (len != kOrderCancelLen) return false;
+            handler.on_order_cancel(decode_order_cancel(msg));
+            return true;
         case 'D':
             if (len != kOrderDeleteLen) return false;
             handler.on_order_delete(decode_order_delete(msg));
+            return true;
+        case 'U':
+            if (len != kOrderReplaceLen) return false;
+            handler.on_order_replace(decode_order_replace(msg));
             return true;
         default:
             handler.on_other(type, msg, len);
