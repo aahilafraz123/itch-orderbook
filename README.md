@@ -1,5 +1,7 @@
 # itch-orderbook
 
+[![CI](https://github.com/aahilafraz123/itch-orderbook/actions/workflows/ci.yml/badge.svg)](https://github.com/aahilafraz123/itch-orderbook/actions/workflows/ci.yml)
+
 A C++20 limit order book that replays a full day of real **NASDAQ TotalView-ITCH 5.0** market data,
 rebuilds every stock's order book message by message, proves the optimized book is correct
 against a simple reference implementation, and benchmarks throughput and per-message latency.
