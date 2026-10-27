@@ -33,8 +33,24 @@ if(OB_SANITIZE)
   target_link_options(ob INTERFACE -fsanitize=address,undefined)
 endif()
 
+option(OB_TSAN "Build with ThreadSanitizer (for the SPSC ring / pipeline)" OFF)
+if(OB_TSAN)
+  target_compile_options(ob INTERFACE -fsanitize=thread -fno-omit-frame-pointer)
+  target_link_options(ob INTERFACE -fsanitize=thread)
+endif()
+
 add_executable(itch_stats src/main.cpp)
 target_link_libraries(itch_stats PRIVATE ob)
+
+add_executable(differential src/differential.cpp)
+target_link_libraries(differential PRIVATE ob)
+
+add_executable(bench src/bench.cpp)
+target_link_libraries(bench PRIVATE ob)
+
+find_package(Threads REQUIRED)
+add_executable(pipeline src/pipeline.cpp)
+target_link_libraries(pipeline PRIVATE ob Threads::Threads)
 
 if(OB_TESTS)
   include(FetchContent)
@@ -51,9 +67,9 @@ if(OB_TESTS)
   enable_testing()
   include(GoogleTest)
 
-  foreach(t test_parser test_reference_book)
+  foreach(t test_parser test_books test_differential test_matching_engine test_spsc_ring)
     add_executable(${t} tests/${t}.cpp)
-    target_link_libraries(${t} PRIVATE ob GTest::gtest_main)
+    target_link_libraries(${t} PRIVATE ob GTest::gtest_main Threads::Threads)
     gtest_discover_tests(${t})
   endforeach()
 endif()
