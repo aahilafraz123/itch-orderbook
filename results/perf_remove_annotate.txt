@@ -1,0 +1,57 @@
+perf annotate of FastBook::remove(), the hottest function in perf_fast_report.txt.
+Same setup: perf record -e cpu-clock, Linux arm64 container, GCC 13 -O3 -march=native,
+bench data/12302019.NASDAQ_ITCH50.prefix2048MB --book fast --runs 1 --no-latency.
+cpu-clock is a timer interrupt, not a precise PMU event, so samples skid onto the instruction after
+the one that stalled. Annotation (right) is from reading the disassembly below.
+
+hottest instructions (% of samples inside remove()):
+   39.65 :   12314:  ldr     w3, [x8, x4]     level array cache miss: the scan's first load (121f0) reads back(), the best
+                                              level; most removes match it at once and branch here, where the stall is sampled
+   16.68 :   121c0:  mov     w3, #0x30        } skid from loading the order's 32-byte record out of the pool
+   14.71 :   122f8:  mov     w0, #0x30        } (ldp q0, q1 at 121a8; first use is the side byte, cmp w0, #'S')
+   13.50 :   12200:  mov     x4, x3           } linear level scan loop (121f0..1220c): compare each level's price,
+    2.75 :   121f4:  sub     x6, x2, #0x1     }  walking from the best price outward
+    2.21 :   12388:  str     w1, [x0, #20]
+    1.59 :   12250:  ubfiz   x1, x1, #5, #32  pool index * 32 (unlinking FIFO neighbors)
+    1.58 :   123ac:  mov     x15, #0x7c15
+    0.83 :   12330:  str     w2, [x0, #24]
+    0.71 :   1223c:  ubfiz   x3, x2, #5, #32
+    0.64 :   121f0:  ldr     w5, [x0, x3]     level scan: load level price
+    0.62 :   121a8:  ldp     q0, q1, [x9]     load the 32-byte order from the pool
+
+disassembly around the hot spots (objdump -d -C):
+121b0: ldrb w0, [sp, #74]            side byte of the order
+121b4: ldrh w2, [sp, #72]            locate
+121b8: cmp w0, #0x53                 'S'?
+121bc: b.eq 122f8
+121c0: mov w3, #0x30                 sizeof(per-stock level storage) = 48
+121c4: ldr w1, [sp, #56]             price
+121c8: umaddl x21, w2, w3, x21       &levels[locate]
+121cc: cmp w0, #0x42                 'B'?
+121d0: b.ne 1230c
+121d4: ldp x8, x10, [x21]            vector begin/end
+121d8: sub x7, x10, x8
+121dc: add x0, x8, #0x20
+121e0: sub x4, x7, #0x20             offset of back()
+121e4: asr x7, x7, #5                number of levels
+121e8: mov x2, x7
+121ec: b 12208
+121f0: ldr w5, [x0, x3]              scan loop
+121f4: sub x6, x2, #0x1
+121f8: cmp w1, w5
+121fc: b.cs 12314
+12200: mov x4, x3
+12204: mov x2, x6
+12208: sub x3, x4, #0x20
+1220c: cbnz x2, 121f0
+...
+122f8: mov w0, #0x30                 ask side: same, offset to the ask vector
+122fc: mov x3, #0x18
+12300: ldr w1, [sp, #56]
+12304: umaddl x0, w0, w2, x3
+12308: add x21, x21, x0
+1230c: mvn w1, w1                    asks keyed by ~price
+12310: b 121d4
+12314: ldr w3, [x8, x4]              level found: read its key
+12318: add x0, x8, x4
+1231c: cmp w1, w3

@@ -1,0 +1,16 @@
+machine: Apple M5 Pro, 24 GB RAM, macOS 26.6.2, Apple clang version 21.0.0 (clang-2100.3.34.2)
+date: 2026-10-27T21:15Z
+power: AC (plugged in)
+command: bench data/12302019.NASDAQ_ITCH50.prefix2048MB --book fast --runs 1 --no-latency --levels-reserve 1024
+
+file: data/12302019.NASDAQ_ITCH50.prefix2048MB (2147483648 bytes), 69406748 messages
+orders created (A/F + U): 37076659, largest order ref: 84171696
+sizing: expected_orders 4194304, levels_reserve 1024; input copied into RAM, mlock'ed
+timer: std::chrono::steady_clock, smallest nonzero step 41 ns
+timer overhead (two back-to-back reads, ns): p50 0, p99 42, p99.9 42, p99.99 125, max 12917
+
+[fast]
+  throughput: median 13.36 M msgs/s (min 13.36, max 13.36 over 1 runs), 69406748 messages
+  heap allocations during replay: 17837 total; 17812 in the first 10% of messages, 25 after
+  live orders at end: 1736351
+  CSV,fast,13355196,13355196,13355196,69406748,17837,25

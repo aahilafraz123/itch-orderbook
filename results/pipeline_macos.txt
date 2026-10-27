@@ -1,0 +1,18 @@
+machine: Apple M5 Pro, 24 GB RAM, macOS 26.6.2, Apple clang version 21.0.0 (clang-2100.3.34.2)
+build: Release -O3 -march=native
+date: 2026-10-27T21:09Z
+power: AC (plugged in), machine otherwise idle
+messages: 69406748 (input copied into RAM, mlock'ed)
+ring: 65536 slots of 72 bytes
+pinning: not available on this OS (threads float)
+
+throughput (flat out)
+  single thread: 10.84 M msgs/s
+  pipelined:     9.03 M msgs/s
+
+latency, one message in flight (ns, available -> applied to book)
+                    samples     p50     p99   p99.9   p99.99        max     mean
+  single thread    67804031      83     500     875     2416    1467375    109.2
+  pipelined        67804031     250     708    1584    16834    4518583    273.6
+
+pipelined books equal single-threaded book: yes

@@ -1,0 +1,54 @@
+machine: Apple M5 Pro, 24 GB RAM, macOS 26.6.2, Apple clang version 21.0.0 (clang-2100.3.34.2)
+build: Release -O3 -march=native
+date: 2026-10-27T21:09Z
+power: AC (plugged in), machine otherwise idle
+file: data/12302019.NASDAQ_ITCH50.prefix2048MB (2147483648 bytes), 69406748 messages
+orders created (A/F + U): 37076659, largest order ref: 84171696
+sizing: expected_orders 4194304, levels_reserve 64; input copied into RAM, mlock'ed
+timer: std::chrono::steady_clock, smallest nonzero step 41 ns
+timer overhead (two back-to-back reads, ns): p50 0, p99 42, p99.9 42, p99.99 1000, max 157875
+
+[ref]
+  throughput: median 3.08 M msgs/s (min 2.71, max 3.28 over 5 runs), 69406748 messages
+  heap allocations during replay: 87541205 total; 7484935 in the first 10% of messages, 80056270 after
+  live orders at end: 1736351
+  latency per book message (ns), median of 5 runs per percentile:
+                      samples      p50      p99    p99.9   p99.99        max     mean
+  ref                67804031      208     1083     1542    11750  101317833    267.4
+  CSV,ref,3081594,2714138,3275924,69406748,87541205,80056270
+
+[std-index]
+  throughput: median 6.27 M msgs/s (min 5.35, max 6.63 over 5 runs), 69406748 messages
+  heap allocations during replay: 37098404 total; 3021656 in the first 10% of messages, 34076748 after
+  live orders at end: 1736351
+  latency per book message (ns), median of 5 runs per percentile:
+                      samples      p50      p99    p99.9   p99.99        max     mean
+  std-index          67804031       83      750     1083     5959     371667    173.5
+  CSV,std-index,6265879,5352730,6633349,69406748,37098404,34076748
+
+[binary-search]
+  throughput: median 11.27 M msgs/s (min 11.15, max 11.39 over 5 runs), 69406748 messages
+  heap allocations during replay: 21745 total; 18147 in the first 10% of messages, 3598 after
+  live orders at end: 1736351
+  latency per book message (ns), median of 5 runs per percentile:
+                      samples      p50      p99    p99.9   p99.99        max     mean
+  binary-search      67804031       83      542      917     4667     547292    103.3
+  CSV,binary-search,11266977,11148609,11392076,69406748,21745,3598
+
+[hybrid]
+  throughput: median 12.17 M msgs/s (min 11.67, max 12.61 over 5 runs), 69406748 messages
+  heap allocations during replay: 21745 total; 18147 in the first 10% of messages, 3598 after
+  live orders at end: 1736351
+  latency per book message (ns), median of 5 runs per percentile:
+                      samples      p50      p99    p99.9   p99.99        max     mean
+  hybrid             67804031       83      500      916     4583     340792     97.5
+  CSV,hybrid,12169106,11665653,12606847,69406748,21745,3598
+
+[fast]
+  throughput: median 12.70 M msgs/s (min 12.44, max 12.84 over 5 runs), 69406748 messages
+  heap allocations during replay: 21745 total; 18147 in the first 10% of messages, 3598 after
+  live orders at end: 1736351
+  latency per book message (ns), median of 5 runs per percentile:
+                      samples      p50      p99    p99.9   p99.99        max     mean
+  fast               67804031       83      417      792     4417     276500     94.8
+  CSV,fast,12703555,12442510,12836771,69406748,21745,3598

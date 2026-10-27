@@ -1,0 +1,16 @@
+perf record -e cpu-clock -g, Linux arm64 container (Docker on Apple M5 Pro, no hardware PMU), GCC 13 -O3 -march=native
+command: bench data/12302019.NASDAQ_ITCH50.prefix2048MB --book fast --runs 1 --no-latency  (69,406,748 messages)
+date: 2026-10-27T21:11Z
+samples cover the whole process, including loading the 2 GB input into RAM and prefaulting the pool (outside the timed replay);
+kernel symbols are not resolvable inside the container, so those samples show as [unknown].
+
+    36.34%  bench    bench                  [.] ob::BasicFastBook<ob::OpenAddressingIndex, (ob::LevelSearch)0>::remove(unsigned int)
+    16.41%  bench    bench                  [.] ob::BasicFastBook<ob::OpenAddressingIndex, (ob::LevelSearch)0>::add(unsigned short, unsigned long, ob::itch::Side, unsigned int, unsigned int)
+    16.19%  bench    [unknown]              [k] 0xffff800081493208
+     9.36%  bench    bench                  [.] bool ob::itch::dispatch<ob::BasicFastBook<ob::OpenAddressingIndex, (ob::LevelSearch)0> >(unsigned char const*, unsigned long, ob::BasicFastBook<ob::OpenAddressingIndex, (ob::LevelSearch)0>&)
+     3.83%  bench    bench                  [.] ob::itch::decode_add_order(unsigned char const*)
+     3.42%  bench    bench                  [.] main
+     2.42%  bench    [vdso]                 [.] __kernel_clock_gettime
+     1.09%  bench    libc.so.6              [.] 0x00000000000a1a4c
+     1.03%  bench    bench                  [.] ob::BasicFastBook<ob::OpenAddressingIndex, (ob::LevelSearch)0>::reduce(unsigned long, unsigned int)
+     1.00%  bench    libc.so.6              [.] 0x00000000000a1a50

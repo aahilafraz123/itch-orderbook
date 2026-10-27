@@ -1,0 +1,10 @@
+machine: Apple M5 Pro, 24 GB RAM, macOS 26.6.2, Apple clang version 21.0.0 (clang-2100.3.34.2)
+date: 2026-10-27T05:55Z
+variant:            fast
+messages replayed:  268744780
+top-of-book checks: 263241937 (after every book-changing message)
+full-depth checks:  263237 (every 1000 messages) + final full check incl. queues
+live orders at end: 0
+anomalies (ref):    0
+wall time:          680.8 s
+result:             MATCH
