@@ -276,16 +276,20 @@ int main(int argc, char** argv) {
     Sizing sz{std::size_t{1} << 22, 64};
     bool do_latency = true;
     bool use_mmap = false;
-    for (int i = 1; i < argc; ++i) {
-        const std::string arg = argv[i];
-        if (arg == "--book" && i + 1 < argc) which = argv[++i];
-        else if (arg == "--runs" && i + 1 < argc) runs = std::stoi(argv[++i]);
-        else if (arg == "--expected-orders" && i + 1 < argc) sz.expected_orders = std::stoull(argv[++i]);
-        else if (arg == "--levels-reserve" && i + 1 < argc) sz.levels_reserve = std::stoull(argv[++i]);
-        else if (arg == "--no-latency") do_latency = false;
-        else if (arg == "--mmap") use_mmap = true;
-        else if (path.empty()) path = arg;
-        else max_messages = std::stoull(arg);
+    try {
+        for (int i = 1; i < argc; ++i) {
+            const std::string arg = argv[i];
+            if (arg == "--book" && i + 1 < argc) which = argv[++i];
+            else if (arg == "--runs" && i + 1 < argc) runs = std::stoi(argv[++i]);
+            else if (arg == "--expected-orders" && i + 1 < argc) sz.expected_orders = std::stoull(argv[++i]);
+            else if (arg == "--levels-reserve" && i + 1 < argc) sz.levels_reserve = std::stoull(argv[++i]);
+            else if (arg == "--no-latency") do_latency = false;
+            else if (arg == "--mmap") use_mmap = true;
+            else if (path.empty()) path = arg;
+            else max_messages = std::stoull(arg);
+        }
+    } catch (const std::exception&) {
+        path.clear();  // unknown flag or non-numeric value: print usage
     }
     if (path.empty() || runs < 1) {
         std::fprintf(stderr, "usage: %s <itch_file> [max_messages] [--book ref|std-index|binary-search|hybrid|fast|all] "

@@ -60,12 +60,16 @@ int run(const ob::MappedFile& file, std::uint64_t max_messages, std::uint64_t ev
 int main(int argc, char** argv) {
     std::string path, variant = "fast";
     std::uint64_t max_messages = UINT64_MAX, every = 1000;
-    for (int i = 1; i < argc; ++i) {
-        const std::string arg = argv[i];
-        if (arg == "--every" && i + 1 < argc) every = std::stoull(argv[++i]);
-        else if (arg == "--variant" && i + 1 < argc) variant = argv[++i];
-        else if (path.empty()) path = arg;
-        else max_messages = std::stoull(arg);
+    try {
+        for (int i = 1; i < argc; ++i) {
+            const std::string arg = argv[i];
+            if (arg == "--every" && i + 1 < argc) every = std::stoull(argv[++i]);
+            else if (arg == "--variant" && i + 1 < argc) variant = argv[++i];
+            else if (path.empty()) path = arg;
+            else max_messages = std::stoull(arg);
+        }
+    } catch (const std::exception&) {
+        path.clear();  // unknown flag or non-numeric value: print usage
     }
     if (path.empty()) {
         std::fprintf(stderr, "usage: %s <itch_file> [max_messages] [--every K] [--variant fast|std-index|binary-search|hybrid]\n", argv[0]);

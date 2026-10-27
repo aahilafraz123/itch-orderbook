@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cctype>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -107,7 +108,7 @@ int main(int argc, char** argv) {
             book_symbol = argv[++i];
         } else if (path.empty()) {
             path = arg;
-        } else if (!have_max) {
+        } else if (!have_max && !arg.empty() && std::isdigit(static_cast<unsigned char>(arg[0]))) {
             max_messages = std::stoull(arg);
             have_max = true;
         } else {

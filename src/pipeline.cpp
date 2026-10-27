@@ -16,6 +16,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <exception>
+#include <stdexcept>
 #include <string>
 #include <thread>
 #include <vector>
@@ -99,18 +100,23 @@ int main(int argc, char** argv) {
     std::string path;
     std::uint64_t max_messages = UINT64_MAX;
     int cpu_parser = -1, cpu_book = -1;
-    for (int i = 1; i < argc; ++i) {
-        const std::string arg = argv[i];
-        if (arg == "--cpus" && i + 1 < argc) {
-            const std::string v = argv[++i];
-            const auto comma = v.find(',');
-            cpu_parser = std::stoi(v.substr(0, comma));
-            cpu_book = std::stoi(v.substr(comma + 1));
-        } else if (path.empty()) {
-            path = arg;
-        } else {
-            max_messages = std::stoull(arg);
+    try {
+        for (int i = 1; i < argc; ++i) {
+            const std::string arg = argv[i];
+            if (arg == "--cpus" && i + 1 < argc) {
+                const std::string v = argv[++i];
+                const auto comma = v.find(',');
+                if (comma == std::string::npos) throw std::invalid_argument("--cpus");
+                cpu_parser = std::stoi(v.substr(0, comma));
+                cpu_book = std::stoi(v.substr(comma + 1));
+            } else if (path.empty()) {
+                path = arg;
+            } else {
+                max_messages = std::stoull(arg);
+            }
         }
+    } catch (const std::exception&) {
+        path.clear();  // unknown flag or non-numeric value: print usage
     }
     if (path.empty()) {
         std::fprintf(stderr, "usage: %s <itch_file> [max_messages] [--cpus P,C]\n", argv[0]);
