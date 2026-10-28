@@ -153,7 +153,8 @@ open-addressing table is 128 MB at 4M expected orders, and stays at most half fu
 
 ## Correctness
 
-**Full trading day, fast vs reference** (`results/differential_full_day.txt`, NASDAQ 2019-12-30):
+**Full trading day, fast vs reference** ([`results/differential_full_day.txt`](results/differential_full_day.txt),
+NASDAQ 2019-12-30, run on commit `ac18c44`):
 
 | | |
 |---|---|
@@ -186,7 +187,8 @@ pass under ThreadSanitizer.
 
 **Setup.** NASDAQ TotalView-ITCH 5.0, 2019-12-30, the first 2 GiB of the day's file:
 69,406,748 messages, 67,804,031 of them book updates. Apple M5 Pro, 24 GB, macOS 26.6,
-Apple clang 21, `-O3 -march=native`, on AC power with the machine otherwise idle. Raw output:
+Apple clang 21, `-O3 -march=native`, on AC power. Background apps, including Chrome, were still
+running, so treat the numbers as a laptop measurement, not a quiet benchmark host. Raw output:
 [`results/bench_macos.txt`](results/bench_macos.txt).
 
 **Method** (`src/bench.cpp`):
@@ -213,28 +215,44 @@ Apple clang 21, `-O3 -march=native`, on AC power with the machine otherwise idle
 
 ### Each optimization, measured
 
-Every row is a real configuration of the code (`BasicFastBook<Index, LevelSearch>`), so each change
-is measured in isolation. All variants pass the same 22 book tests and the differential tests.
+Every row is a real configuration of the code (`BasicFastBook<Index, LevelSearch>`, instantiated
+in `src/bench.cpp`). Each row of the first table changes exactly one thing from the row above it;
+the second table varies only the level lookup. All variants pass the same 22 book tests and the
+differential tests.
 
-| Configuration | Throughput (M msgs/s) | Range, 5 runs | vs. previous | Heap allocs after warm-up |
-|---|---:|---:|---:|---:|
-| **Reference book**: `unordered_map` orders, `std::map` levels, `std::list` queues | 3.08 | 2.71–3.28 | | 80,056,270 |
-| **+ order pool, intrusive FIFO lists, sorted-vector levels** (index still `std::unordered_map`) | 6.27 | 5.35–6.63 | **2.0×** | 34,076,748 |
-| **+ open-addressing order index** (binary-search level lookup) | 11.27 | 11.15–11.39 | **1.8×** | 3,598 |
-| **+ linear level lookup from the best price** (shipped `FastBook`) | **12.70** | 12.44–12.84 | **1.13×** | 3,598 |
-| Hybrid lookup: linear over the 8 best levels, then binary (experiment) | 12.17 | 11.67–12.61 | 0.96× vs. `FastBook` | 3,598 |
+**Data structures**, one change per row:
 
-Overall: **4.1× the reference book's throughput**. Heap allocations after warm-up drop from more
-than one per message (80.1M) to **3,598**. Those come from stocks whose books grow deeper than the
-64 price levels reserved for each stock-side when its Stock Directory message arrives. Rerunning
-with `--levels-reserve 1024` brings the count to 25
-([`results/bench_levels_reserve_1024.txt`](results/bench_levels_reserve_1024.txt)), at the cost of reserving more memory for
-thousands of thinly traded stocks. The ~18,000 allocations in the warm-up window are those
-reservations themselves, made before the market opens.
+| Configuration | Throughput (M msgs/s) | Range, 5 runs | vs. previous | p99 (ns) | Heap allocs after warm-up |
+|---|---:|---:|---:|---:|---:|
+| **Reference book**: `std::unordered_map` order index, `std::map` levels, `std::list` queues | 3.08 | 2.71–3.28 | | 1,083 | 80,056,270 |
+| **+ preallocated order pool with free list, intrusive FIFO lists, sorted-vector levels** (linear lookup; index still `std::unordered_map`) | 6.27 | 5.35–6.63 | **2.0×** | 750 | 34,076,748 |
+| **+ open-addressing order index** (shipped `FastBook`) | **12.70** | 12.44–12.84 | **2.0×** | **417** | **3,598** |
 
-The hybrid lookup was meant to cap the cost of long scans in deep books. It's slightly slower
-than the plain linear scan here, although the run ranges overlap, so `FastBook` keeps the
-simpler linear scan.
+**Level lookup**, all with the open-addressing index:
+
+| Lookup | Throughput (M msgs/s) | Range, 5 runs | p99 (ns) |
+|---|---:|---:|---:|
+| **Linear scan from the best price** (shipped `FastBook`) | **12.70** | 12.44–12.84 | **417** |
+| Hybrid: linear over the 8 best levels, then binary search | 12.17 | 11.67–12.61 | 500 |
+| Binary search | 11.27 | 11.15–11.39 | 542 |
+
+Overall: **4.1× the reference book's throughput**. Each step roughly doubles it: first getting
+rid of per-order allocation and node-based containers, then replacing `std::unordered_map` with
+the open-addressing table.
+
+On this data, linear lookup from the best price beats binary search. That fits updates clustering
+near the top of the book, and the profile below agrees, but scan lengths themselves weren't
+measured. The hybrid lookup was meant to cap the cost of long scans in deep books. It's slightly
+slower than the plain linear scan here, although their run ranges overlap, so `FastBook` keeps
+the simpler linear scan.
+
+Heap allocations after warm-up drop from more than one per message (80.1M) to **3,598**. Those
+come from stocks whose books grow deeper than the 64 price levels reserved for each stock-side
+when its Stock Directory message arrives. Rerunning with `--levels-reserve 1024` brings the count
+to 25 ([`results/bench_levels_reserve_1024.txt`](results/bench_levels_reserve_1024.txt)), at the
+cost of reserving more memory for thousands of thinly traded stocks. The allocations in the
+warm-up window are those reservations themselves, made before the market opens. In the 1,024-level
+run there are 17,812 of them, which is exactly the 8,906 Stock Directory messages × 2 sides.
 
 ### Latency per message (ns)
 

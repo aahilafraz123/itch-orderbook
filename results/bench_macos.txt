@@ -1,7 +1,7 @@
 machine: Apple M5 Pro, 24 GB RAM, macOS 26.6.2, Apple clang version 21.0.0 (clang-2100.3.34.2)
 build: Release -O3 -march=native
 date: 2026-10-27T21:09Z
-power: AC (plugged in), machine otherwise idle
+power: AC (plugged in); background apps, including Chrome, were still running
 file: data/12302019.NASDAQ_ITCH50.prefix2048MB (2147483648 bytes), 69406748 messages
 orders created (A/F + U): 37076659, largest order ref: 84171696
 sizing: expected_orders 4194304, levels_reserve 64; input copied into RAM, mlock'ed

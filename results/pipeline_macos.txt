@@ -1,7 +1,7 @@
 machine: Apple M5 Pro, 24 GB RAM, macOS 26.6.2, Apple clang version 21.0.0 (clang-2100.3.34.2)
 build: Release -O3 -march=native
 date: 2026-10-27T21:09Z
-power: AC (plugged in), machine otherwise idle
+power: AC (plugged in); background apps, including Chrome, were still running
 messages: 69406748 (input copied into RAM, mlock'ed)
 ring: 65536 slots of 72 bytes
 pinning: not available on this OS (threads float)
